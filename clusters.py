@@ -51,11 +51,10 @@ def buffer(feature, tamano, nombre):
 
 def spatialJoin(tablaIn, tablaJoin):
     nameFieldsTbIn = [x.name for x in arcpy.ListFields(tablaIn)] + [CODIGO+"_1", DISTANCIA, "X_1", "Y_1"]
-    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, os.path.join(pathgdb, "SJ_COTIZADO"))
+    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, os.path.join(pathgdb, "SJ_PENDIENTE"))
     nameFieldsSpJn = [x.name for x in arcpy.ListFields(spJoin)]
     extraerDistancia(spJoin)
     codigos = Counter([x[1] for x in arcpy.da.SearchCursor(spJoin, [CODIGO, CODIGO + "_1"])])
-    print(codigos)
     for x in codigos.items():
         if x[1]==1:
             ejecutar1cluster(x)
@@ -83,15 +82,12 @@ def ejecutar1cluster(tabla):
 def ejecutarNcluster(tabla):
     pass
 
-def extractBySJ():
-    acont = arcpy.SelectLayerByLocation_management("ACONT_mfl", 'INTERSECT', "cli", '#', 'NEW_SELECTION', 'NOT_INVERT')
-
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
     bufferCotizado = buffer(cotizados, 500, "cotizado")
     bufferPendiente = buffer(pendientes, 500, "pendiente")
-    spatialJoin(cotizados, bufferPendiente)
+    spatialJoin(pendientes, bufferCotizado)
 
 if __name__ == '__main__':
     main()
