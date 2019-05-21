@@ -51,7 +51,7 @@ def buffer(feature, tamano, nombre):
 
 def spatialJoin(tablaIn, tablaJoin):
     nameFieldsTbIn = [x.name for x in arcpy.ListFields(tablaIn)] + [CODIGO+"_1", DISTANCIA, "X_1", "Y_1"]
-    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, os.path.join(pathgdb, "SJ_PENDIENTE"))
+    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, os.path.join(pathgdb, "SJ_PENDIENTE"), "JOIN_ONE_TO_MANY","KEEP_ALL")
     nameFieldsSpJn = [x.name for x in arcpy.ListFields(spJoin)]
     extraerDistancia(spJoin)
     codigos = Counter([x[1] for x in arcpy.da.SearchCursor(spJoin, [CODIGO, CODIGO + "_1"])])
@@ -77,7 +77,9 @@ def extraerDistancia(tabla):
                 pass
             
 def ejecutar1cluster(tabla):
-    pass
+    arcpy.AddField_management(tabla, CODIGO + "_N", "TEXT", "#","#",100)
+    # acont = arcpy.SelectLayerByLocation_management("ACONT_mfl", 'INTERSECT', "cli", '#', 'NEW_SELECTION', 'NOT_INVERT')
+
 
 def ejecutarNcluster(tabla):
     pass
