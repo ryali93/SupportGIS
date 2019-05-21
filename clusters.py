@@ -4,15 +4,18 @@
 import os
 import arcpy
 import time
+from collections import Counter
 arcpy.env.overwriteOutput = True
 
 workspace = r"C:\CLUSTERS"
 nameGdb = "clusters"
-ws = r'E:\2019\GUSTAVO\CLUSTER'
+ws = os.path.dirname(__file__) 
 TB_COTIZADOS = os.path.join(ws, "COTIZADOS_6m.csv")
 TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
 Y = "LATITUD"
 X = "LONGITUD"
+CODIGO = "CODIGO"
+DISTANCIA = "DISTANCIA"
 
 if os.path.exists(workspace)==False:
     os.mkdir(workspace)
@@ -47,10 +50,41 @@ def buffer(feature, tamano, nombre):
     return bufferXY
 
 def spatialJoin(tablaIn, tablaJoin):
-    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, "in_memory\\spJoinTmp")
+    nameFieldsTbIn = [x.name for x in arcpy.ListFields(tablaIn)] + [CODIGO+"_1", DISTANCIA, "X_1", "Y_1"]
+    spJoin = arcpy.SpatialJoin_analysis(tablaIn, tablaJoin, os.path.join(pathgdb, "SJ_COTIZADO"))
+    nameFieldsSpJn = [x.name for x in arcpy.ListFields(spJoin)]
+    extraerDistancia(spJoin)
+    codigos = Counter([x[1] for x in arcpy.da.SearchCursor(spJoin, [CODIGO, CODIGO + "_1"])])
+    print(codigos)
+    for x in codigos.items():
+        if x[1]==1:
+            ejecutar1cluster(x)
+        elif x[1]>1:
+            ejecutarNcluster(x)
+    
+    nameFieldsRm = [x for x in nameFieldsSpJn if x not in nameFieldsTbIn]
+    arcpy.DeleteField_management(spJoin, nameFieldsRm)
+
     return spJoin
 
-# def modificarCodigo(tablaJoin):
+def extraerDistancia(tabla):
+    arcpy.AddField_management(tabla, DISTANCIA, "DOUBLE")
+    with arcpy.da.UpdateCursor(tabla, ["X","Y","X_1","Y_1", DISTANCIA]) as cursor:
+        for m in cursor:
+            try:
+                m[4] = round(math.sqrt((pow(m[0] - m[2], 2) + pow(m[1] - m[3], 2))) * 111110, 1)
+                cursor.updateRow(m)
+            except:
+                pass
+            
+def ejecutar1cluster(tabla):
+    pass
+
+def ejecutarNcluster(tabla):
+    pass
+
+def extractBySJ():
+    acont = arcpy.SelectLayerByLocation_management("ACONT_mfl", 'INTERSECT', "cli", '#', 'NEW_SELECTION', 'NOT_INVERT')
 
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
