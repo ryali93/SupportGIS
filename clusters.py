@@ -10,8 +10,10 @@ arcpy.env.overwriteOutput = True
 workspace = r"C:\CLUSTERS"
 nameGdb = "clusters"
 ws = os.path.dirname(__file__) 
-TB_COTIZADOS = os.path.join(ws, "COTIZADOS_6m.csv")
-TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
+TB_COTIZADOS = arcpy.GetParameterAsText(0)
+TB_PENDIENTES = arcpy.GetParameterAsText(1)
+# TB_COTIZADOS = os.path.join(ws, "COTIZADOS_6m.csv")
+# TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
 Y = "LATITUD"
 X = "LONGITUD"
 CODIGO = "CODIGO"
@@ -70,7 +72,11 @@ def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
     with arcpy.da.UpdateCursor(tb_near, ["IN_FID", "NEAR_FID", "NEAR_DIST", "CODIGO_COTIZADO", "CODIGO_PENDIENTE", "DISTANCIA", "CODIGO_N"]) as cursor:
         for x in cursor:
             x[3] = codigoCotizado.get(x[1])
+<<<<<<< HEAD
+            x[4] = codigoPendiente.get(x[1])
+=======
             x[4] = codigoPendiente.get(x[0])
+>>>>>>> 4ab84b5196aaf11dbca1e52fa5c809cd778eee42
             x[5] = x[2]
             cursor.updateRow(x)
     
@@ -144,8 +150,13 @@ def ejecutarNcluster(tabla, codigoUnico, tablaJoin):
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
+<<<<<<< HEAD
+    # bufferCotizado = buffer(cotizados, 300, "cotizado")
+    bufferPendiente = buffer(pendientes, 300, "pendiente")
+=======
     bufferCotizado = buffer(cotizados, 500, "cotizado")
     bufferPendiente = buffer(pendientes, 500, "pendiente")
+>>>>>>> 4ab84b5196aaf11dbca1e52fa5c809cd778eee42
     # spatialJoin(cotizados, bufferPendiente)
     spatialAnalysis(bufferPendiente, pendientes, cotizados, 500)
 
