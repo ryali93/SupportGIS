@@ -95,7 +95,7 @@ def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
     with arcpy.da.UpdateCursor(tb_near, ["CODIGO_PENDIENTE", "CODIGO_N"]) as cursor:
         for x in cursor:
             # Caso 1
-            if codPendientes.get(x[0]) == 1:
+            if len(x[0].split("_"))==1:
                 x[1] = "ClusterSimple_"+x[0]
             # Caso 2
             else:
