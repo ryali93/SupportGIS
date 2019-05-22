@@ -4,6 +4,7 @@
 import os
 import arcpy
 import time
+import csv
 from collections import Counter
 arcpy.env.overwriteOutput = True
 
@@ -12,6 +13,7 @@ nameGdb = "clusters"
 ws = os.path.dirname(__file__) 
 TB_COTIZADOS = arcpy.GetParameterAsText(0)
 TB_PENDIENTES = arcpy.GetParameterAsText(1)
+ws = arcpy.GetParameterAsText(2)
 # TB_COTIZADOS = os.path.join(ws, "COTIZADOS_6m.csv")
 # TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
 Y = "LATITUD"
@@ -95,6 +97,10 @@ def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
     with arcpy.da.UpdateCursor(tb_near, ["CODIGO_PENDIENTE", "CODIGO_N"]) as cursor:
         for x in cursor:
             # Caso 1
+<<<<<<< HEAD
+            # if codPendientes.get(x[0]) == 1:
+=======
+>>>>>>> c703a92ba2d3a663ce26f521805ae112b50175fb
             if len(x[0].split("_"))==1:
                 x[1] = "ClusterSimple_"+x[0]
             # Caso 2
@@ -113,16 +119,29 @@ def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
 
             rowtb[2] = extraerDistancia(x1, y1, x2, y2)
             cursorTbpend.updateRow(rowtb)
+
+    return tb_near
     
 def extraerDistancia(x1, y1, x2, y2):
     return round(math.sqrt((pow(x1 - x2, 2) + pow(y1 - y2, 2))) * 111110, 1)
+
+def tabla2csv(tabla, output_csv, csv_delimiter):
+    with open(os.path.join(ws, output_csv), 'wb') as csv_file:
+        writer = csv.writer(csv_file, delimiter=csv_delimiter)
+        fld_names = [x.name for x in arcpy.ListFields(tabla)]
+        writer.writerow(fld_names)
+        with arcpy.da.SearchCursor(tabla, fld_names) as cursor:
+            for row in cursor:
+                writer.writerow(row)
+        csv_file.close()
 
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
 
     bufferPendiente = buffer(pendientes, 150, "pendiente")
-    spatialAnalysis(bufferPendiente, pendientes, cotizados, 500)
+    tabla = spatialAnalysis(bufferPendiente, pendientes, cotizados, 500)
+    tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
 if __name__ == '__main__':
     main()
