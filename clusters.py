@@ -10,7 +10,7 @@ arcpy.env.overwriteOutput = True
 
 workspace = r"C:\CLUSTERS"
 nameGdb = "clusters"
-ws = os.path.dirname(__file__) 
+ws = os.path.dirname(__file__)
 TB_COTIZADOS = arcpy.GetParameterAsText(0)
 TB_PENDIENTES = arcpy.GetParameterAsText(1)
 ws = arcpy.GetParameterAsText(2)
@@ -69,57 +69,40 @@ def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
     multipart = arcpy.MultipartToSinglepart_management(dissol1, os.path.join(pathgdb, "multipart")).getOutput(0)
     field_pend = "_ ".join(list(map(fx,pendientePunto)))
     pendientelyr = arcpy.MakeFeatureLayer_management(pendientePunto, 'PENDIENTES_Layer', '#', '#',field_info = field_pend).getOutput(0)
-    sp_pendiente = arcpy.SpatialJoin_analysis(multipart, pendientelyr, os.path.join(pathgdb, "sp_pendiente"), 'JOIN_ONE_TO_ONE', 'KEEP_ALL', campos, 'INTERSECT', '#', '#').getOutput(0)
-    featurePoint = arcpy.FeatureToPoint_management(sp_pendiente, os.path.join(pathgdb, "featurePoint"), 'INSIDE').getOutput(0)
+    sp_pendiente = arcpy.SpatialJoin_analysis(multipart, pendientelyr, "in_memory\\sp_pendiente", 'JOIN_ONE_TO_ONE', 'KEEP_ALL', campos, 'INTERSECT', '#', '#').getOutput(0)
+    pendienteCentroide = arcpy.FeatureToPoint_management(sp_pendiente, os.path.join(pathgdb, "pendienteCentroide"), 'INSIDE').getOutput(0)
     # OJO buffer de 500???????
-    bufferPoint = arcpy.Buffer_analysis(featurePoint, os.path.join(pathgdb, "BF_Pendiente_N"), '{} Meters'.format(longBuffer))
-    tb_near = arcpy.GenerateNearTable_analysis(bufferPoint, cotizado, os.path.join(pathgdb, "TB_resumen"), '{} Meters'.format(longBuffer), 'NO_LOCATION', 'NO_ANGLE', 'ALL', cantidadCotizados, 'GEODESIC')
-    codigoCotizado = {x[0]:x[1] for x in arcpy.da.SearchCursor(cotizado, ["OBJECTID", CODIGO])}
-    codigoPendiente = {x[0]:x[1] for x in arcpy.da.SearchCursor(bufferPoint, ["OBJECTID", CODIGO])}
-    len_pen= max([len(v)for v in codigoPendiente.values()])
-    print len_pen
+    # bufferPoint = arcpy.Buffer_analysis(pendienteCentroide, os.path.join(pathgdb, "BF_Pendiente_N"), '{} Meters'.format(longBuffer))
+    tb_near = arcpy.GenerateNearTable_analysis(pendienteCentroide, cotizado, os.path.join(pathgdb, "TB_resumen"), '{} Meters'.format(longBuffer), 'NO_LOCATION', 'NO_ANGLE', 'ALL', cantidadCotizados, 'GEODESIC')
+    codigoCotizado  = {x[0]:[x[1], x[2], x[3]] for x in arcpy.da.SearchCursor(cotizado, ["OBJECTID", CODIGO, "SHAPE@X", "SHAPE@Y"])}
+    codigoPendiente = {x[0]:[x[1], x[2], x[3]] for x in arcpy.da.SearchCursor(pendienteCentroide, ["OBJECTID", CODIGO, "SHAPE@X", "SHAPE@Y"])}
 
+    arcpy.AddField_management(tb_near, "X_COTIZADO", "DOUBLE")
+    arcpy.AddField_management(tb_near, "Y_COTIZADO", "DOUBLE")
+    arcpy.AddField_management(tb_near, "X_PENDIENTE", "DOUBLE")
+    arcpy.AddField_management(tb_near, "Y_PENDIENTE", "DOUBLE")
     arcpy.AddField_management(tb_near, "DISTANCIA", "DOUBLE")
-    arcpy.AddField_management(tb_near, "CODIGO_PENDIENTE", "TEXT", "#", "#", len_pen)
+    arcpy.AddField_management(tb_near, "CODIGO_PENDIENTE", "TEXT", "#", "#", 100)
     arcpy.AddField_management(tb_near, "CODIGO_COTIZADO", "TEXT", "#", "#", 100)
     arcpy.AddField_management(tb_near, "CODIGO_N", "TEXT", "#", "#", 100)
 
-    with arcpy.da.UpdateCursor(tb_near, ["IN_FID", "NEAR_FID", "NEAR_DIST", "CODIGO_COTIZADO", "CODIGO_PENDIENTE", "DISTANCIA"]) as cursor:
+    with arcpy.da.UpdateCursor(tb_near, ["IN_FID", "NEAR_FID", "NEAR_DIST", "CODIGO_COTIZADO", "CODIGO_PENDIENTE", "DISTANCIA", "X_COTIZADO", "Y_COTIZADO", "X_PENDIENTE", "Y_PENDIENTE", "CODIGO_N"]) as cursor:
         for x in cursor:
-            x[3] = codigoCotizado.get(x[1])
-            x[4] = codigoPendiente.get(x[1])
-            x[4] = codigoPendiente.get(x[0])
-            x[5] = x[2]
-            cursor.updateRow(x)
+            x[3] = codigoCotizado.get(x[1])[0]
+            x[4] = codigoPendiente.get(x[0])[0]
+            x[5] = round(x[2],2)
 
-    codPendientes = Counter([x[0] for x in arcpy.da.SearchCursor(tb_near, ["CODIGO_PENDIENTE"])])
+            x[6] = codigoCotizado.get(x[1])[1]
+            x[7] = codigoCotizado.get(x[1])[2]
 
-    with arcpy.da.UpdateCursor(tb_near, ["CODIGO_PENDIENTE", "CODIGO_N"]) as cursor:
-        for x in cursor:
-            # Caso 1
-<<<<<<< HEAD
-            # if codPendientes.get(x[0]) == 1:
-=======
->>>>>>> c703a92ba2d3a663ce26f521805ae112b50175fb
-            if len(x[0].split("_"))==1:
-                x[1] = "ClusterSimple_"+x[0]
-            # Caso 2
+            x[8] = codigoPendiente.get(x[0])[1]
+            x[9] = codigoPendiente.get(x[0])[2]
+
+            if len(x[4].split("_"))==1:
+                x[10] = "ClusterSimple_"+x[4]
             else:
-                x[1] = "SuperCluster_"+x[0]
+                x[10] = "SuperCluster_"+x[4]
             cursor.updateRow(x)
-
-    with arcpy.da.UpdateCursor(tb_near, ["CODIGO_PENDIENTE", "CODIGO_COTIZADO", "DISTANCIA"]) as cursorTbpend:
-        for rowtb in cursorTbpend:
-            
-            sqlPendiente = "{}='{}'".format(CODIGO, rowtb[0])
-            x1, y1 = [m for m in arcpy.da.SearchCursor(featurePoint, ["SHAPE@X", "SHAPE@Y"], sqlPendiente)][0]
-
-            sqlCotizado = "{}='{}'".format(CODIGO, rowtb[1])
-            x2, y2 = [n for n in arcpy.da.SearchCursor(cotizado, ["SHAPE@X", "SHAPE@Y"], sqlCotizado)][0]
-
-            rowtb[2] = extraerDistancia(x1, y1, x2, y2)
-            cursorTbpend.updateRow(rowtb)
-
     return tb_near
     
 def extraerDistancia(x1, y1, x2, y2):
