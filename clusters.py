@@ -11,11 +11,16 @@ arcpy.env.overwriteOutput = True
 workspace = r"C:\CLUSTERS"
 nameGdb = "clusters"
 ws = os.path.dirname(__file__)
-TB_COTIZADOS = arcpy.GetParameterAsText(0)
-TB_PENDIENTES = arcpy.GetParameterAsText(1)
-ws = arcpy.GetParameterAsText(2)
-# TB_COTIZADOS = os.path.join(ws, "COTIZADOS_6m.csv")
-# TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
+# TB_COTIZADOS = arcpy.GetParameterAsText(0)
+# TB_PENDIENTES = arcpy.GetParameterAsText(1)
+# ws = arcpy.GetParameterAsText(2)
+TB_COTIZADOS  = os.path.join(ws, "COTIZADOS_6m.csv")
+TB_PENDIENTES = os.path.join(ws, "PENDIENTES_xCOTIZAR.csv")
+GDB_DIR       = os.path.join(ws, "CLUSTERS.gdb")
+
+COBERTURA_P2P = os.path.join(GDB_DIR, "COBERTURA_P2P_MIXTA")
+URA           = os.path.join(GDB_DIR, "URA_EC")
+
 Y = "LATITUD"
 X = "LONGITUD"
 CODIGO = "CODIGO"
@@ -49,6 +54,27 @@ def leerCsv(tabla):
     copy = arcpy.CopyFeatures_management(xyTmp, os.path.join(pathgdb, nameTb))
     return copy
 
+def extraerPendientes(pendientes, cobertura):
+    pendientes = arcpy.MakeFeatureLayer_management(pendientes, "pendientes")
+    mfl = arcpy.MakeFeatureLayer_management(cobertura, "cobertura")
+    pendienteCobertura = arcpy.SelectLayerByLocation_management("pendientes", 'INTERSECT', "cobertura", '#', '#', 'INVERT')
+    fields = [CODIGO, "SHAPE@X", "SHAPE@Y"]
+    ultimaMilla = [x for x in arcpy.da.SearchCursor(pendienteCobertura, fields)]
+    arcpy.SelectLayerByAttribute_management(pendienteCobertura, "CLEAR_SELECTION")
+
+    pendienteDentroCobertura = arcpy.SelectLayerByLocation_management(pendientes, 'INTERSECT', "cobertura", '#', '#', 'NOT_INVERT')
+    pendiente = arcpy.CopyFeatures_management(pendienteDentroCobertura, os.path.join(pathgdb, "PENDIENTE"))
+    return pendiente, ultimaMilla
+
+def addUltimaMillaToTb(ultimaMilla, tb_near):
+    fields = ["CODIGO_PENDIENTE", "X_PENDIENTE", "Y_PENDIENTE", "CODIGO_N"]
+    for row in ultimaMilla:
+        lista = [row[0], row[1], row[2]]
+        m = "UltimaMilla_" + row[0]
+        lista.append(m)
+        with arcpy.da.InsertCursor(tb_near, fields) as cursor:
+            cursor.insertRow(lista)
+
 def buffer(feature, tamano, nombre):
     bufferXY = arcpy.Buffer_analysis(feature, os.path.join(pathgdb, "BF_"+nombre), '{} Meters'.format(tamano))
     return bufferXY
@@ -60,19 +86,18 @@ def fx(x):
         res="{0} {0} HIDDEN NONE"
     return res.format(x)
 
-
-def spatialAnalysis(pendienteBuffer, pendientePunto, cotizado, longBuffer):
-    cantidadCotizados = 10
-    # campos = 'ORIG_FID "ORIG_FID" true true false 4 Long 0 0 ,First,#,multipart,ORIG_FID,-1,-1;Shape_Length "Shape_Length" false true true 8 Double 0 0 ,First,#,multipart,Shape_Length,-1,-1;Shape_Area "Shape_Area" false true true 8 Double 0 0 ,First,#,multipart,Shape_Area,-1,-1;CODIGO "CODIGO" true true false 8000 Text 0 0 ,Join,#,PENDIENTES,CODIGO,-1,-1;CLIENTE "CLIENTE" true true false 8000 Text 0 0 ,First,#,PENDIENTES,CLIENTE,-1,-1;TIPO_REQUERIMIENTO "TIPO REQUERIMIENTO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,TIPO_REQUERIMIENTO,-1,-1;ALIAS "ALIAS" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ALIAS,-1,-1;RESPONSABLE_VU "RESPONSABLE VU" true true false 8000 Text 0 0 ,First,#,PENDIENTES,RESPONSABLE_VU,-1,-1;SALESFORCE "SALESFORCE" true true false 8000 Text 0 0 ,First,#,PENDIENTES,SALESFORCE,-1,-1;PROYECTO "PROYECTO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,PROYECTO,-1,-1;REGISTRO "REGISTRO" true true false 8 Date 0 0 ,First,#,PENDIENTES,REGISTRO,-1,-1;SEGMENTO "SEGMENTO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,SEGMENTO,-1,-1;DEPARTAMENTO "DEPARTAMENTO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,DEPARTAMENTO,-1,-1;PROVINCIA "PROVINCIA" true true false 8000 Text 0 0 ,First,#,PENDIENTES,PROVINCIA,-1,-1;DISTRITO "DISTRITO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,DISTRITO,-1,-1;DIRECCION "DIRECCION" true true false 8000 Text 0 0 ,First,#,PENDIENTES,DIRECCION,-1,-1;NUMERO "NUMERO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,NUMERO,-1,-1;ACCESO "ACCESO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ACCESO,-1,-1;TENDIDO_EXTERNO "TENDIDO EXTERNO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,TENDIDO_EXTERNO,-1,-1;TIPO_SEDE "TIPO SEDE" true true false 8000 Text 0 0 ,First,#,PENDIENTES,TIPO_SEDE,-1,-1;NRO_PISOS "NRO PISOS" true true false 4 Long 0 0 ,First,#,PENDIENTES,NRO_PISOS,-1,-1;ZONAL "ZONAL" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ZONAL,-1,-1;RESPONSABLE "RESPONSABLE" true true false 8000 Text 0 0 ,First,#,PENDIENTES,RESPONSABLE,-1,-1;REGION "REGION" true true false 8000 Text 0 0 ,First,#,PENDIENTES,REGION,-1,-1;ENLACE "ENLACE" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ENLACE,-1,-1;LATITUD "LATITUD" true true false 8 Double 0 0 ,First,#,PENDIENTES,LATITUD,-1,-1;LONGITUD "LONGITUD" true true false 8 Double 0 0 ,First,#,PENDIENTES,LONGITUD,-1,-1;UNIDAD_DE_NEGOCIO "UNIDAD DE NEGOCIO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,UNIDAD_DE_NEGOCIO,-1,-1;ESTUDIO "ESTUDIO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ESTUDIO,-1,-1;NODO "NODO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,NODO,-1,-1;DIAS "DIAS" true true false 4 Long 0 0 ,First,#,PENDIENTES,DIAS,-1,-1;PEP "PEP" true true false 8000 Text 0 0 ,First,#,PENDIENTES,PEP,-1,-1;PEP2 "PEP2" true true false 8000 Text 0 0 ,First,#,PENDIENTES,PEP2,-1,-1;GRAFO "GRAFO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,GRAFO,-1,-1;TOTAL_SOLES "TOTAL SOLES" true true false 8 Double 0 0 ,First,#,PENDIENTES,TOTAL_SOLES,-1,-1;TOTAL_DOLARES "TOTAL DOLARES" true true false 4 Long 0 0 ,First,#,PENDIENTES,TOTAL_DOLARES,-1,-1;ESTADO_ESTUDIO "ESTADO ESTUDIO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ESTADO_ESTUDIO,-1,-1;COTIZACION_SOLES "COTIZACION SOLES" true true false 4 Long 0 0 ,First,#,PENDIENTES,COTIZACION_SOLES,-1,-1;COTIZACION_DOLARES "COTIZACION DOLARES" true true false 4 Long 0 0 ,First,#,PENDIENTES,COTIZACION_DOLARES,-1,-1;FECHA_ENVIO "FECHA ENVIO" true true false 8 Date 0 0 ,First,#,PENDIENTES,FECHA_ENVIO,-1,-1;INICIO_ESTUDIO "INICIO ESTUDIO" true true false 8 Date 0 0 ,First,#,PENDIENTES,INICIO_ESTUDIO,-1,-1;FIN_ESTUDIO "FIN ESTUDIO" true true false 8 Date 0 0 ,First,#,PENDIENTES,FIN_ESTUDIO,-1,-1;FIN_CONSOLIDACION "FIN CONSOLIDACION" true true false 8 Date 0 0 ,First,#,PENDIENTES,FIN_CONSOLIDACION,-1,-1;INICIO_EJECUCION "INICIO EJECUCION" true true false 8000 Text 0 0 ,First,#,PENDIENTES,INICIO_EJECUCION,-1,-1;INICIO_IMPLEMENTACION "INICIO IMPLEMENTACION" true true false 8000 Text 0 0 ,First,#,PENDIENTES,INICIO_IMPLEMENTACION,-1,-1;ESTADO "ESTADO" true true false 8000 Text 0 0 ,First,#,PENDIENTES,ESTADO,-1,-1;X "X" true true false 8 Double 0 0 ,First,#,PENDIENTES,X,-1,-1;Y "Y" true true false 8 Double 0 0 ,First,#,PENDIENTES,Y,-1,-1'
+def extractCentroid(pendienteBuffer, pendientePunto, cotizado):
     campos = 'ORIG_FID "ORIG_FID" true true false 4 Long 0 0 ,First,#,multipart,ORIG_FID,-1,-1;Shape_Length "Shape_Length" false true true 8 Double 0 0 ,First,#,multipart,Shape_Length,-1,-1;Shape_Area "Shape_Area" false true true 8 Double 0 0 ,First,#,multipart,Shape_Area,-1,-1;CODIGO "CODIGO" true true false 8000 Text 0 0 ,Join,"_",PENDIENTES_Layer,CODIGO,-1,-1;X "X" true true false 8 Double 0 0 ,First,#,PENDIENTES_Layer,X,-1,-1;Y "Y" true true false 8 Double 0 0 ,First,#,PENDIENTES_Layer,Y,-1,-1'
     dissol1 = arcpy.Dissolve_management(pendienteBuffer, "in_memory\\dissolve1", '#', '#', 'MULTI_PART', 'DISSOLVE_LINES').getOutput(0)
     multipart = arcpy.MultipartToSinglepart_management(dissol1, os.path.join(pathgdb, "multipart")).getOutput(0)
     field_pend = "_ ".join(list(map(fx,pendientePunto)))
     pendientelyr = arcpy.MakeFeatureLayer_management(pendientePunto, 'PENDIENTES_Layer', '#', '#',field_info = field_pend).getOutput(0)
     sp_pendiente = arcpy.SpatialJoin_analysis(multipart, pendientelyr, "in_memory\\sp_pendiente", 'JOIN_ONE_TO_ONE', 'KEEP_ALL', campos, 'INTERSECT', '#', '#').getOutput(0)
-    pendienteCentroide = arcpy.FeatureToPoint_management(sp_pendiente, os.path.join(pathgdb, "pendienteCentroide"), 'INSIDE').getOutput(0)
-    # OJO buffer de 500???????
-    # bufferPoint = arcpy.Buffer_analysis(pendienteCentroide, os.path.join(pathgdb, "BF_Pendiente_N"), '{} Meters'.format(longBuffer))
+    m_Centroide = arcpy.FeatureToPoint_management(sp_pendiente, os.path.join(pathgdb, "pendientesCentroide"), 'INSIDE').getOutput(0)
+    return m_Centroide
+
+def createTable(pendienteCentroide, cotizado, longBuffer):
+    cantidadCotizados = 10
     tb_near = arcpy.GenerateNearTable_analysis(pendienteCentroide, cotizado, os.path.join(pathgdb, "TB_resumen"), '{} Meters'.format(longBuffer), 'NO_LOCATION', 'NO_ANGLE', 'ALL', cantidadCotizados, 'GEODESIC')
     codigoCotizado  = {x[0]:[x[1], x[2], x[3]] for x in arcpy.da.SearchCursor(cotizado, ["OBJECTID", CODIGO, "SHAPE@X", "SHAPE@Y"])}
     codigoPendiente = {x[0]:[x[1], x[2], x[3]] for x in arcpy.da.SearchCursor(pendienteCentroide, ["OBJECTID", CODIGO, "SHAPE@X", "SHAPE@Y"])}
@@ -122,8 +147,12 @@ def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
 
+    pendientes, ultimaMilla = extraerPendientes(pendientes, COBERTURA_P2P)
+
     bufferPendiente = buffer(pendientes, 150, "pendiente")
-    tabla = spatialAnalysis(bufferPendiente, pendientes, cotizados, 500)
+    centroide = extractCentroid(bufferPendiente, pendientes, cotizados)
+    tabla = createTable(centroide, cotizados, 500)
+    addUltimaMillaToTb(ultimaMilla, tabla)
     tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
 if __name__ == '__main__':
