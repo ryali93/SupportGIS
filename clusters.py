@@ -57,12 +57,12 @@ def leerCsv(tabla):
 def extraerPendientes(pendientes, cobertura):
     pendientes = arcpy.MakeFeatureLayer_management(pendientes, "pendientes")
     mfl = arcpy.MakeFeatureLayer_management(cobertura, "cobertura")
-    pendienteCobertura = arcpy.SelectLayerByLocation_management("pendientes", 'INTERSECT', "cobertura", '#', '#', 'INVERT')
+    pendienteCobertura = arcpy.SelectLayerByLocation_management("pendientes", 'INTERSECT', "cobertura", '#', '#', 'NOT_INVERT')
     fields = [CODIGO, "SHAPE@X", "SHAPE@Y"]
     ultimaMilla = [x for x in arcpy.da.SearchCursor(pendienteCobertura, fields)]
     arcpy.SelectLayerByAttribute_management(pendienteCobertura, "CLEAR_SELECTION")
 
-    pendienteDentroCobertura = arcpy.SelectLayerByLocation_management(pendientes, 'INTERSECT', "cobertura", '#', '#', 'NOT_INVERT')
+    pendienteDentroCobertura = arcpy.SelectLayerByLocation_management(pendientes, 'INTERSECT', "cobertura", '#', '#', 'INVERT')
     pendiente = arcpy.CopyFeatures_management(pendienteDentroCobertura, os.path.join(pathgdb, "PENDIENTE"))
     return pendiente, ultimaMilla
 
@@ -143,6 +143,19 @@ def tabla2csv(tabla, output_csv, csv_delimiter):
                 writer.writerow(row)
         csv_file.close()
 
+def spjoinTb(tablaPrincipal, tablaCopia, campos=[]):
+    nameFields = [x.name for x in arcpy.ListFields(tablaPrincipal)] + campos
+    tb_join = arcpy.SpatialJoin_analysis(
+        tablaPrincipal, 
+        tablaCopia, 
+        "in_memory\\tb_join", 
+        "JOIN_ONE_TO_ONE", "KEEP_ALL", "#", "INTERSECT")
+    nameFieldsNew = [x.name for x in arcpy.ListFields(tb_join)]
+    eraseFields = list(set(nameFieldsNew) - set(nameFields))
+    arcpy.DeleteField_management(tb_join, eraseFields)
+    tabla = arcpy.CopyFeatures_management(tb_join, os.path.join(pathgdb, "TB_resumen"))
+    return tabla
+
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
@@ -153,6 +166,12 @@ def main():
     centroide = extractCentroid(bufferPendiente, pendientes, cotizados)
     tabla = createTable(centroide, cotizados, 500)
     addUltimaMillaToTb(ultimaMilla, tabla)
+
+    # URA = arcpy.MakeFeatureLayer_management(URA, "URA")
+    print(URA)
+    URA = arcpy.MakeFeatureLayer_management(r'E:\2019\GUSTAVO\SupportGIS\CLUSTERS.gdb\URA_EC', "URA")
+    tabla = spjoinTb(tabla, URA, ["ZONAL", "JEFATURA", "EE_CC"])
+
     tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
 if __name__ == '__main__':
