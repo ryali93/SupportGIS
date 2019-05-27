@@ -143,17 +143,28 @@ def tabla2csv(tabla, output_csv, csv_delimiter):
                 writer.writerow(row)
         csv_file.close()
 
-def spjoinTb(tablaPrincipal, tablaCopia, campos=[]):
-    nameFields = [x.name for x in arcpy.ListFields(tablaPrincipal)] + campos
+def spjoinTb(tablaPrincipal, tablaCopia):
     tb_join = arcpy.SpatialJoin_analysis(
         tablaPrincipal, 
         tablaCopia, 
-        "in_memory\\tb_join", 
+        "in_memory\\tb_join2", 
         "JOIN_ONE_TO_ONE", "KEEP_ALL", "#", "INTERSECT")
-    nameFieldsNew = [x.name for x in arcpy.ListFields(tb_join)]
-    eraseFields = list(set(nameFieldsNew) - set(nameFields))
-    arcpy.DeleteField_management(tb_join, eraseFields)
-    tabla = arcpy.CopyFeatures_management(tb_join, os.path.join(pathgdb, "TB_resumen"))
+    fields = ["CODIGO", "ZONAL", "JEFATURA", "EE_CC"]
+    fieldsURA = [x for x in arcpy.da.SearchCursor(tb_join, fields)]
+    return fieldsURA
+
+def updateTbFieldsURA(tabla, fieldsUpdate, campos):
+    for campo in campos:
+        arcpy.AddField_management(tabla, campo, "TEXT", "#", "#", 100)
+    fields = ["CODIGO_PENDIENTE"] + campos
+    with arcpy.da.UpdateCursor(tabla, fields) as cursor:
+        for x in cursor:
+            for f in fieldsUpdate:
+                if f[0] == x[0].split("_")[0]:
+                    x[1] = f[1]
+                    x[2] = f[2]
+                    x[3] = f[3]
+                    cursor.updateRow(x)
     return tabla
 
 def main():
@@ -164,13 +175,13 @@ def main():
 
     bufferPendiente = buffer(pendientes, 150, "pendiente")
     centroide = extractCentroid(bufferPendiente, pendientes, cotizados)
+    
+    fieldsupdateURA = spjoinTb(pendientes, URA)
+
     tabla = createTable(centroide, cotizados, 500)
     addUltimaMillaToTb(ultimaMilla, tabla)
 
-    # URA = arcpy.MakeFeatureLayer_management(URA, "URA")
-    print(URA)
-    URA = arcpy.MakeFeatureLayer_management(r'E:\2019\GUSTAVO\SupportGIS\CLUSTERS.gdb\URA_EC', "URA")
-    tabla = spjoinTb(tabla, URA, ["ZONAL", "JEFATURA", "EE_CC"])
+    tabla = updateTbFieldsURA(tabla, fieldsupdateURA, ["ZONAL", "JEFATURA", "EE_CC"])
 
     tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
