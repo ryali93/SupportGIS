@@ -137,9 +137,11 @@ def tabla2csv(tabla, output_csv, csv_delimiter):
     with open(os.path.join(ws, output_csv), 'wb') as csv_file:
         writer = csv.writer(csv_file, delimiter=csv_delimiter)
         fld_names = [x.name for x in arcpy.ListFields(tabla)]
+        print(fld_names)
         writer.writerow(fld_names)
         with arcpy.da.SearchCursor(tabla, fld_names) as cursor:
             for row in cursor:
+                print(row)
                 writer.writerow(row)
         csv_file.close()
 
@@ -149,7 +151,7 @@ def spjoinTb(tablaPrincipal, tablaCopia):
         tablaCopia, 
         "in_memory\\tb_join2", 
         "JOIN_ONE_TO_ONE", "KEEP_ALL", "#", "INTERSECT")
-    fields = ["CODIGO", "ZONAL", "JEFATURA", "EE_CC"]
+    fields = ["CODIGO", "ZONAL_1", "JEFATURA", "EE_CC"]
     fieldsURA = [x for x in arcpy.da.SearchCursor(tb_join, fields)]
     return fieldsURA
 
