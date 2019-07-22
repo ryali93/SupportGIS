@@ -169,6 +169,46 @@ def updateTbFieldsURA(tabla, fieldsUpdate, campos):
                     cursor.updateRow(x)
     return tabla
 
+def updateLocation(tabla):
+    X = "X_PENDIENTE"
+    Y = "Y_PENDIENTE"
+    campos = ["CODIGO_N", "ZONAL", "JEFATURA", "EE_CC"]
+    campos2 = ["CODIGO_N", "ZONAL_1", "JEFATURA_1", "EE_CC_1"]
+    # coords = [x for x in arcpy.da.SearchCursor(tabla, ["CODIGO_N", X, Y]) if x[0][:11] == "UltimaMilla"]
+    xyTmp = arcpy.MakeXYEventLayer_management(tabla, X, Y, "in_memory\\XYtb", arcpy.SpatialReference(4326))
+    sp_pendiente = arcpy.SpatialJoin_analysis(xyTmp, URA, "in_memory\\xyTmp_URA", 'JOIN_ONE_TO_ONE', 'KEEP_ALL').getOutput(0)
+    DatosUbicacion = [x for x in arcpy.da.SearchCursor(sp_pendiente, campos2) if x[0]!=None if x[0][:11] == "UltimaMilla"]
+    print([x.name for x in arcpy.ListFields(sp_pendiente)])
+    with arcpy.da.UpdateCursor(tabla, campos) as cursor:
+        for m in cursor:
+            if m[0]!=None:
+                if m[0][:11] == "UltimaMilla":
+                    for n in DatosUbicacion:
+                        print(m)
+                        print(n)
+                        if m[0] == n[0]:
+                            m[1] = n[1]
+                            m[2] = n[2]
+                            m[3] = n[3]
+                    cursor.updateRow(m)
+    return tabla
+
+def completeTable(tablain, tablafrom):
+    sindatos = [x for x in arcpy.da.SearchCursor(tablain, ["CODIGO", "X", "Y"])]
+    print("sindatos")
+    print(sindatos)
+    cursor = arcpy.da.InsertCursor(tablafrom, ["CODIGO_PENDIENTE", "X_COTIZADO", "Y_COTIZADO"])
+    codigopendientes = [y[0] for y in arcpy.da.SearchCursor(tablafrom, ["CODIGO_PENDIENTE"])]
+    print("codigopendientes")
+    print(codigopendientes)
+    [cursor.insertRow(x) for x in sindatos if x[0] not in codigopendientes]
+    del cursor
+    return tablafrom
+
+def addEstadoField(tablain, tablafrom):
+    [x for x in arcpy.da.SearchCursor()]
+
+
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
@@ -184,6 +224,8 @@ def main():
     addUltimaMillaToTb(ultimaMilla, tabla)
 
     tabla = updateTbFieldsURA(tabla, fieldsupdateURA, ["ZONAL", "JEFATURA", "EE_CC"])
+    tabla = completeTable(pendientes, tabla)
+    tabla = updateLocation(tabla)
 
     tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
