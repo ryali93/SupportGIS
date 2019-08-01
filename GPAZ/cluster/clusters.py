@@ -170,12 +170,10 @@ def updateTbFieldsURA(tabla, fieldsUpdate, campos):
     return tabla
 
 def updateLocation(tabla):
-    X = "X_PENDIENTE"
-    Y = "Y_PENDIENTE"
     campos = ["CODIGO_N", "ZONAL", "JEFATURA", "EE_CC"]
     campos2 = ["CODIGO_N", "ZONAL_1", "JEFATURA_1", "EE_CC_1"]
-    # coords = [x for x in arcpy.da.SearchCursor(tabla, ["CODIGO_N", X, Y]) if x[0][:11] == "UltimaMilla"]
-    xyTmp = arcpy.MakeXYEventLayer_management(tabla, X, Y, "in_memory\\XYtb", arcpy.SpatialReference(4326))
+
+    xyTmp = arcpy.MakeXYEventLayer_management(tabla, "X", "Y", "in_memory\\XYtb", arcpy.SpatialReference(4326))
     sp_pendiente = arcpy.SpatialJoin_analysis(xyTmp, URA, "in_memory\\xyTmp_URA", 'JOIN_ONE_TO_ONE', 'KEEP_ALL').getOutput(0)
     DatosUbicacion = [x for x in arcpy.da.SearchCursor(sp_pendiente, campos2) if x[0]!=None if x[0][:11] == "UltimaMilla"]
     print([x.name for x in arcpy.ListFields(sp_pendiente)])
@@ -191,6 +189,17 @@ def updateLocation(tabla):
                             m[2] = n[2]
                             m[3] = n[3]
                     cursor.updateRow(m)
+
+    completar = [x for x in arcpy.da.SearchCursor(sp_pendiente, ["X", "Y", "ZONAL_1", "JEFATURA_1", "EE_CC_1"], "X IS NOT NULL")]
+
+    with arcpy.da.UpdateCursor(tabla, ["X", "Y", "ZONAL", "JEFATURA", "EE_CC"]) as cursor:
+        for m in cursor:
+            for n in completar:
+                if m[0] == n[0] and m[1] == m[1]:
+                    m[2] = n[2]
+                    m[3] = n[3]
+                    m[4] = n[4]
+            cursor.updateRow(m)
     return tabla
 
 def completeTable(tablain, tablafrom):
@@ -205,8 +214,37 @@ def completeTable(tablain, tablafrom):
     del cursor
     return tablafrom
 
-def addEstadoField(tablain, tablafrom):
-    [x for x in arcpy.da.SearchCursor()]
+def createXYfields(tabla):
+    arcpy.AddField_management(tabla, "X", "DOUBLE")
+    arcpy.AddField_management(tabla, "Y", "DOUBLE")
+    with arcpy.da.UpdateCursor(tabla, ["X_PENDIENTE", "Y_PENDIENTE", "X_COTIZADO", "Y_COTIZADO", "X", "Y"]) as cursor:
+        for t in cursor:
+            if t[0] != None:
+                t[4] = t[0]
+                t[5] = t[1]
+            if t[2] != None:
+                t[4] = t[2]
+                t[5] = t[3]
+            cursor.updateRow(t)
+    return tabla
+
+def addEstadoField(tabla, pendientes, cotizados):
+    estadoPendiente = [x for x in arcpy.da.SearchCursor(pendientes, ["CODIGO", "ESTADO"])]
+    estadoCotizado = [x for x in arcpy.da.SearchCursor(cotizados, ["CODIGO", "ESTADO"])]
+    arcpy.AddField_management(tabla, "ESTADO", "TEXT", "#", "#", 100)
+
+    with arcpy.da.UpdateCursor(tabla, ["CODIGO_PENDIENTE", "CODIGO_COTIZADO", "ESTADO"]) as cursor:
+        for x in cursor:
+            for m in estadoPendiente:
+                if m[0] != None and x[0] != None:
+                    if m[0] in x[0]:
+                        x[2] = m[1]
+            for n in estadoCotizado:
+                if n[0] != None and x[1] != None:
+                    if n[0] in x[1]:
+                        x[2] = n[1]
+            cursor.updateRow(x)
+    return tabla
 
 
 def main():
@@ -225,7 +263,10 @@ def main():
 
     tabla = updateTbFieldsURA(tabla, fieldsupdateURA, ["ZONAL", "JEFATURA", "EE_CC"])
     tabla = completeTable(pendientes, tabla)
+    tabla = createXYfields(tabla)
     tabla = updateLocation(tabla)
+
+    tabla = addEstadoField(tabla, pendientes, cotizados)
 
     tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
