@@ -39,6 +39,7 @@ def createGdb(carpeta):
     return os.path.join(carpeta, nameFile, nameGdb + ".gdb")
 
 pathgdb = createGdb(workspace)
+TB_Final = os.path.join(pathgdb, "TB_final")
 
 def modifyCoords(tabla):
     arcpy.AddField_management(tabla, "X", "DOUBLE")
@@ -246,6 +247,51 @@ def addEstadoField(tabla, pendientes, cotizados):
             cursor.updateRow(x)
     return tabla
 
+def deleteBadRows(tabla):
+    lista = []
+    cod_pendientes_null = [[lista.append(y) for y in x[0].split("_")] for x in arcpy.da.SearchCursor(tabla, ["CODIGO_PENDIENTE"], "CODIGO_N LIKE 'SuperCluster%'")]
+    lista = list(set(lista))
+    sql = "CODIGO_PENDIENTE IN ({})".format(str(lista)[1:-1].replace("u",""))
+    
+    with arcpy.da.UpdateCursor(tabla, ["*"], sql) as cursor:
+        for x in cursor:
+            cursor.deleteRow()
+    return tabla
+
+
+def reorder_fields(table, out_table, field_order, add_missing=True):
+    existing_fields = arcpy.ListFields(table)
+    existing_field_names = [field.name for field in existing_fields]
+
+    existing_mapping = arcpy.FieldMappings()
+    existing_mapping.addTable(table)
+
+    new_mapping = arcpy.FieldMappings()
+
+    def add_mapping(field_name):
+        mapping_index = existing_mapping.findFieldMapIndex(field_name)
+        if mapping_index != -1:
+            field_map = existing_mapping.fieldMappings[mapping_index]
+            new_mapping.addFieldMap(field_map)
+
+    for field_name in field_order:
+        if field_name not in existing_field_names:
+            raise Exception("Field: {0} not in {1}".format(field_name, table))
+
+        add_mapping(field_name)
+
+    if add_missing:
+        missing_fields = [f for f in existing_field_names if f not in field_order]
+        for field_name in missing_fields:
+            add_mapping(field_name)
+
+    arcpy.Merge_management(table, out_table, new_mapping)
+    return out_table
+
+def tabla2excel(tabla):
+    ordenFields = ["CODIGO_PENDIENTE", "X_PENDIENTE", "Y_PENDIENTE", "DISTANCIA", "CODIGO_COTIZADO", "ESTADO", "X_COTIZADO", "Y_COTIZADO", "CODIGO_N", "ZONAL", "JEFATURA", "EE_CC"]
+    tablaNueva = reorder_fields(tabla, TB_Final, ordenFields)
+    arcpy.TableToExcel_conversion(tablaNueva, "clusters.xls")
 
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
@@ -268,7 +314,9 @@ def main():
 
     tabla = addEstadoField(tabla, pendientes, cotizados)
 
-    tabla2csv(tabla, "Tabla_resumen.csv", ",")
+    tabla = deleteBadRows(tabla)
+    tabla2excel(tabla)
+    # tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
 if __name__ == '__main__':
     main()
