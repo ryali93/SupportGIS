@@ -138,11 +138,9 @@ def tabla2csv(tabla, output_csv, csv_delimiter):
     with open(os.path.join(ws, output_csv), 'wb') as csv_file:
         writer = csv.writer(csv_file, delimiter=csv_delimiter)
         fld_names = [x.name for x in arcpy.ListFields(tabla)]
-        print(fld_names)
         writer.writerow(fld_names)
         with arcpy.da.SearchCursor(tabla, fld_names) as cursor:
             for row in cursor:
-                print(row)
                 writer.writerow(row)
         csv_file.close()
 
@@ -205,12 +203,8 @@ def updateLocation(tabla):
 
 def completeTable(tablain, tablafrom):
     sindatos = [x for x in arcpy.da.SearchCursor(tablain, ["CODIGO", "X", "Y"])]
-    print("sindatos")
-    print(sindatos)
-    cursor = arcpy.da.InsertCursor(tablafrom, ["CODIGO_PENDIENTE", "X_COTIZADO", "Y_COTIZADO"])
+    cursor = arcpy.da.InsertCursor(tablafrom, ["CODIGO_PENDIENTE", "X_PENDIENTE", "Y_PENDIENTE"])
     codigopendientes = [y[0] for y in arcpy.da.SearchCursor(tablafrom, ["CODIGO_PENDIENTE"])]
-    print("codigopendientes")
-    print(codigopendientes)
     [cursor.insertRow(x) for x in sindatos if x[0] not in codigopendientes]
     del cursor
     return tablafrom
@@ -248,15 +242,15 @@ def addEstadoField(tabla, pendientes, cotizados):
     return tabla
 
 def deleteBadRows(tabla):
-    lista = []
-    cod_pendientes_null = [[lista.append(y) for y in x[0].split("_")] for x in arcpy.da.SearchCursor(tabla, ["CODIGO_PENDIENTE"], "CODIGO_N LIKE 'SuperCluster%'")]
-    lista = list(set(lista))
-    sql = "CODIGO_PENDIENTE IN ({})".format(str(lista)[1:-1].replace("u",""))
-    
-    with arcpy.da.UpdateCursor(tabla, ["*"], sql) as cursor:
-        for x in cursor:
-            cursor.deleteRow()
-    return tabla
+   lista = []
+   cod_pendientes_null = [[lista.append(y) for y in x[0].split("_")] for x in arcpy.da.SearchCursor(tabla, ["CODIGO_PENDIENTE"], "CODIGO_N LIKE 'SuperCluster%'")]
+   lista = list(set(lista))
+   if len(lista) > 0:
+       sql = "CODIGO_PENDIENTE IN ({})".format(str(lista)[1:-1].replace("u",""))
+       with arcpy.da.UpdateCursor(tabla, ["*"], sql) as cursor:
+           for x in cursor:
+               cursor.deleteRow()
+   return tabla
 
 
 def reorder_fields(table, out_table, field_order, add_missing=True):
@@ -293,6 +287,12 @@ def tabla2excel(tabla):
     tablaNueva = reorder_fields(tabla, TB_Final, ordenFields)
     arcpy.TableToExcel_conversion(tablaNueva, "clusters.xls")
 
+def export2kml(tabla):
+    # arcpy.AddField_management("X_N", "Y_N", )
+    XY_kml = arcpy.MakeXYEventLayer_management(tabla, "X", "Y", "in_memory\\XY_kml", arcpy.SpatialReference(4326))
+    arcpy.LayerToKML_conversion(XY_kml, "clusters.kmz")
+
+
 def main():
     cotizados = leerCsv(TB_COTIZADOS)
     pendientes = leerCsv(TB_PENDIENTES)
@@ -316,6 +316,7 @@ def main():
 
     tabla = deleteBadRows(tabla)
     tabla2excel(tabla)
+    export2kml(tabla)
     # tabla2csv(tabla, "Tabla_resumen.csv", ",")
 
 if __name__ == '__main__':
