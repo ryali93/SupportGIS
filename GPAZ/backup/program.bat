@@ -1,0 +1,1 @@
+python D:\RYali\SupportGIS\GPAZ\backup\trigger_backup.py
