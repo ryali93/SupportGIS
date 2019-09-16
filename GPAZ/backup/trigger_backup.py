@@ -31,10 +31,13 @@ def create_datasets(gdb, datasets):
 
 def copy_features(sde, gdb, datasets):
     for ds in datasets:
+        crs = arcpy.Describe(os.path.join(sde, ds)).spatialReference
         for fc in arcpy.ListFeatureClasses(feature_dataset=ds):
             path_sde = os.path.join(sde, ds, fc)
             path_gdb = os.path.join(gdb, ds.split(".")[-1])
+            
             arcpy.FeatureClassToFeatureClass_conversion(path_sde, path_gdb, fc.split(".")[-1])
+        arcpy.DefineProjection_management(path_gdb, crs)
 
 def main():
     if os.path.exists(workspace)==False: os.mkdir(workspace)
