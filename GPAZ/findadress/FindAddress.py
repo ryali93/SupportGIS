@@ -39,9 +39,10 @@ class findAdress(object):
                 pd.Series([df.iloc[indice][self.fieldIndice],
                     gdpoint["x"],
                     gdpoint["y"],
+                    df.iloc[indice][self.fieldAddress],
                     attr["Match_addr"],
                     attr["Score"]],
-                    index=[self.fieldIndice, "x", "y", "Match_addr", "Score"] ), ignore_index=True)
+                    index=[self.fieldIndice, "x", "y", self.fieldAddress,"Match_addr", "Score"] ), ignore_index=True)
         return df
 
     def main(self):
@@ -56,6 +57,8 @@ class findAdress(object):
 
         data = data[data["x"]!=0]
 
+        data = data[[self.fieldIndice, self.fieldAddress, 'x', 'y']]
+
         geometry = [Point(xy) for xy in zip(data.x, data.y)]
         crs = {'init': 'epsg:4326'}
         geo_df = GeoDataFrame(data, crs=crs, geometry=geometry)
@@ -68,14 +71,14 @@ if __name__ == '__main__':
         fieldIndice = 'CLIENTE'
         fieldAddress = 'DIRECCION'
         ubicacion = 'Juliaca, PER'
-        output = 'data.shp'
+        output = 'data3.shp'
         rango = [0, 21]
 
         poo = findAdress(pathFilename, fieldIndice, fieldAddress, ubicacion, output, rango)
         poo.main()
 
         import webbrowser
-        webbrowser.open('https://ryali93.github.io/blog')
+        # webbrowser.open('https://ryali93.github.io/blog')
 
     except Exception as e:
         print(e.message)
