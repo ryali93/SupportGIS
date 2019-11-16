@@ -36,13 +36,14 @@ class findAdress(object):
             gdpoint = x.as_dict["geometry"]
             attr = x.as_dict["attributes"]
             df = df.append(
-                pd.Series([df.iloc[indice][self.fieldIndice],
+                pd.Series([df.iloc[indice]["ID"],
+                    df.iloc[indice][self.fieldIndice],
                     gdpoint["x"],
                     gdpoint["y"],
                     df.iloc[indice][self.fieldAddress],
                     attr["Match_addr"],
                     attr["Score"]],
-                    index=[self.fieldIndice, "x", "y", self.fieldAddress,"Match_addr", "Score"] ), ignore_index=True)
+                    index=["ID", self.fieldIndice, "x", "y", self.fieldAddress,"Match_addr", "Score"] ), ignore_index=True)
         return df
 
     def main(self):
@@ -57,7 +58,7 @@ class findAdress(object):
 
         data = data[data["x"]!=0]
 
-        data = data[[self.fieldIndice, self.fieldAddress, 'x', 'y']]
+        data = data[["ID", self.fieldIndice, self.fieldAddress, 'x', 'y']]
 
         geometry = [Point(xy) for xy in zip(data.x, data.y)]
         crs = {'init': 'epsg:4326'}
